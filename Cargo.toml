@@ -15,3 +15,5 @@ tokio_wasi = { version = "1.25.1", features = ["macros", "rt"] }
 log = "0.4"
 serde_json = "1.0"
 anyhow = "1"
+chatgpt = "0.1"
+

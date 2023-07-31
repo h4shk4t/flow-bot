@@ -3,6 +3,7 @@ use discord_flows::{
     ProvidedBot, Bot,
 };
 use flowsnet_platform_sdk::logger;
+use chatgpt::prelude::*;
 
 #[no_mangle]
 #[tokio::main(flavor = "current_thread")]
@@ -16,6 +17,14 @@ pub async fn run() -> anyhow::Result<()> {
 async fn handler(bot: &ProvidedBot, msg: Message) {
     logger::init();
     let discord = bot.get_client();
+    
+    let gpt_key = std::env::var("gptKey").unwrap();
+
+    let client = ChatGPT::new(gpt_key)?;
+
+    let response: CompletionResponse = client
+        .send_message(msg.content)
+        .await?;
 
     if msg.author.bot {
         log::debug!("ignored bot message");
@@ -27,7 +36,7 @@ async fn handler(bot: &ProvidedBot, msg: Message) {
     }
 
     let channel_id = msg.channel_id;
-    let resp = format!("Welcome to flows.network.\nYou just said: '{}'.\nLearn more at: https://github.com/flows-network/hello-world\n", msg.content);
+    let resp = format!(response.message().content);
 
     _ = discord.send_message(
         channel_id.into(),
