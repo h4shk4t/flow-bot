@@ -3,33 +3,6 @@ use discord_flows::{
     ProvidedBot, Bot,
 };
 use flowsnet_platform_sdk::logger;
-use chatgpt::prelude::*;
-use hyper::body::Buf;
-use hyper::{header, Body, Client, Request};
-use hyper_tls::HttpsConnector;
-
-#[derive(Deserialize, Debug)]
-struct OAIChoices {
-    text: String,
-    index: u8,
-    logprobs: Option<u8>,
-    finish_reason: String,
-}
-
-#[derive(serde::Deserialize, Debug)]
-struct Response{
-    id: Option<String>,
-    object: Option<String>,
-    created: Option<u64>,
-    model: Option<String>,
-    choices: Vec<OAIChoices>
-}
-
-#[derive(serde::Deserialize, Debug)]
-struct Request {
-    prompt: String,
-    max_tokens: u16,
-}
 
 #[no_mangle]
 #[tokio::main(flavor = "current_thread")]
@@ -41,45 +14,20 @@ pub async fn run() -> anyhow::Result<()> {
 }
 
 
-#[tokio::main]
 async fn handler(bot: &ProvidedBot, msg: Message) {
     logger::init();
     let discord = bot.get_client();
+
+    let user_message = msg.content.trim().to_lowercase(); 
+
+    let static_qa: Vec<(&str, &str)> = vec![
+        ("what's your favorite song?", "My favorite song is 'Bohemian Rhapsody' by Queen."),
+        ("who is your favorite artist?", "I love listening to music by Billie Eilish."),
+        ("recommend me a song.", "I recommend 'Shape of You' by Ed Sheeran."),
+        ("play some music.", "I'm just a text bot and can't play music, but I can recommend songs!"),
+        ("What is your favourite language?", "I am a text bot, but my favourite language is Rust for sure!")
+    ];
     
-    let gpt_key = std::env::var("gptKey").unwrap();
-
-    let https = HttpsConnector::new();
-    let client = Client::builder().build(https);
-    let uri = "https://api.openai.com/v1/chat/completions";
-    let author_header_val = format!("Bearer {}", gpt_key);
-
-
-    let oai_request = Request {
-        prompt: format!("{}", msg.content),
-        max_tokens: 1000, 
-    };
-
-    let body = Body::from(serde_json::to_vec(&oai_request)?);
-
-    let req = Request::post(uri)
-        .header(header::CONTENT_TYPE, "application/json") 
-        .header("Authorization", &auth_header_val) 
-        .body(body) 
-        .unwrap(); 
-
-    
-    let res = client.request(req).await?;
-
-    let body = hyper::body::aggregate(res).await?; 
-    
-    let json: Response = serde_json::from_reader(body.reader())?;
-
-    // let client = ChatGPT::new(gpt_key)?;
-
-    // let response: CompletionResponse = client
-    //     .send_message(msg.content)
-    //     .await?;
-
     if msg.author.bot {
         log::debug!("ignored bot message");
         return;
@@ -90,12 +38,17 @@ async fn handler(bot: &ProvidedBot, msg: Message) {
     }
 
     let channel_id = msg.channel_id;
-    let resp = format!("{}",json.choices[0].text);
 
-    _ = discord.send_message(
-        channel_id.into(),
-        &serde_json::json!({
-            "content": resp
-        }),
-    ).await;
+    if let Some(answer) = static_qa.iter().find(|(q, _)| user_message.contains(q)) {
+        let resp = format!("{}", answer.1);
+
+        _ = discord
+            .send_message(
+                channel_id.into(),
+                &serde_json::json!({
+                    "content": resp
+                }),
+            )
+            .await;
+    }
 }
